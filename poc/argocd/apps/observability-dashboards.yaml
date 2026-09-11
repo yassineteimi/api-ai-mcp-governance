@@ -8,7 +8,7 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: https://github.com/yassineteimi/traefik-hub-triple-gate.git
+    repoURL: https://github.com/yassineteimi/api-ai-mcp-governance.git
     targetRevision: main
     path: poc/observability
   destination:

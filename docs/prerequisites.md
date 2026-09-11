@@ -67,6 +67,7 @@ All tokens go in a gitignored `.env` (copy from `.env.example`). The checks belo
 | Dependency | Purpose | Status |
 | --- | --- | --- |
 | **Traefik Hub trial token** | Register the gateway to the cluster (`helm upgrade`); needs **AI + MCP** entitlements | ✅ present · entitlement confirmed at gateway connect (M0) |
+| **Offline entitlement** (optional) | Runs the gateway with no platform link at all; must be chosen when **creating** the gateway so the token carries the `offline` claim | ⏭️ not in this trial token, so this PoC runs connected |
 | **NVIDIA hosted NIM** (`nvapi-` key) | LLM traffic **and** the safety guard, OpenAI-compatible, no GPU | ✅ verified (auth + inference) |
 | **Second LLM provider** (optional) | Failover demo | ⏳ deferred to M2 |
 | **MCP server** (`mcp-ecommerce-agent`) | Workload behind Gate 3 | ✅ located locally |

@@ -15,6 +15,14 @@ how does it sit next to the alternatives".
     fast in this space; everything here is **as of late 2025** and linked to a
     source; verify before quoting.
 
+!!! success "Reviewed with the vendor"
+    An earlier revision of this page drew three conclusions from **trial defaults and
+    documentation examples** rather than from the product: that the AI and MCP
+    gateways were Kubernetes-first, that offline mode was an open question, and that
+    guard observability needed assembly. Traefik reviewed the page and corrected all
+    three; the text below reflects the corrections, with sources. Keeping the method
+    honest matters more than keeping the first draft.
+
 ## What impressed me
 
 - **CRD-native, GitOps-first by construction.** Every gate in this PoC is a YAML
@@ -32,27 +40,40 @@ how does it sit next to the alternatives".
   agent is not a compromised system" is a message that lands with a CISO.
 - **Standards-aligned telemetry.** AI metrics follow the OpenTelemetry **GenAI
   semantic conventions** (token usage, model, cost), so observability is portable,
-  not a proprietary lock-in.
+  not a proprietary lock-in. Guard decisions are part of that: both guards emit a
+  blocking **`reason`** you name yourself, as a counter label and a span attribute.
+- **Provider-agnostic, not Kubernetes-bound.** Hub is built on OSS Traefik Proxy, so
+  the same dynamic configuration is expressed as **Kubernetes CRDs, Docker labels, or
+  plain file-provider YAML**, and the AI and MCP gateways are configured the same way
+  as anything else. The published examples lean Kubernetes-heavy, which is a
+  documentation shape rather than a product limit. For a VM-only or Docker-only
+  estate the capability travels with you.
 
 ## What I'd flag
 
-- **Observability needs assembly.** Request metrics are on Prometheus, but the
-  AI/MCP metrics are **OTLP-only**: you must run a collector to land them in
-  Prometheus. Content Guard has no first-class counter (blocks only show as `403`),
-  and a denied MCP tool call doesn't populate `mcp_tool_name`. The signals are
-  excellent; the **out-of-the-box dashboarding is not**, so budget for it.
-- **The SaaS control-plane dependency is the headline risk for my market** (see
-  below). During the PoC the agent logged `Unable to ping platform api.traefik.io`, a reminder that the gateway data
-  plane is self-hosted but the **control plane phones home** by default.
-- **Trial/entitlement coupling.** AI and MCP gateways require license entitlements;
-  fine for a PoC, but procurement and air-gap teams will want the offline licensing
-  story in writing.
-- **Deployment model: not Kubernetes-only, but AI/MCP is K8s-first.** Traefik and
-  the Hub API Gateway run on [VMs, Docker, Swarm, and plain file config](https://doc.traefik.io/traefik-hub/api-gateway/setup/installation/docker)
-  too, which matters for customers who haven't adopted Kubernetes. But the
-  **AI Gateway and MCP Gateway features are clearly CRD-first** in the docs. For a
-  VM-only estate I'd verify their availability/parity outside Kubernetes rather than
-  assume it.
+- **AI and MCP metrics are OTLP-only, so plan the pipeline.** Request metrics sit on
+  Traefik's Prometheus endpoint, but the GenAI and MCP metrics are emitted over
+  **OTLP**. That is a deliberate OTel-native design rather than a gap: if you already
+  run an OTel pipeline you plug straight in, and since Prometheus 3.0 you can
+  [enable its native OTLP receiver](https://prometheus.io/docs/guides/opentelemetry/)
+  (`--web.enable-otlp-receiver`) and skip the collector entirely. I ran a collector in
+  this PoC because I was building the pipeline from nothing. Greenfield setup cost,
+  not a product shortcoming.
+- **The AI metrics are opt-in.** Every GenAI metric is enabled through the
+  `observability.metrics` block on each AI middleware (`level: detailed`, or an
+  `excludeList`). Sensible for cardinality control, but it means an unconfigured
+  middleware looks quiet. Worth knowing before you conclude a signal is missing, which
+  is exactly the mistake I made on my first pass.
+- **One possible bug, reported.** On a **denied** MCP `tools/call`, I could not get the
+  tool name populated on the metric, so deny-by-tool charts lean on `error_type` plus
+  the route's `403`. Traefik's own read is that this may be an unexpected bug rather
+  than intended behaviour, and it is being investigated. Flagged here as an open item,
+  not a verdict.
+- **Entitlement coupling at trial time.** AI, MCP and offline mode are separate
+  license entitlements. My trial token carried none of the offline claim, which is
+  why this PoC ran connected. Nothing unusual for commercial software, but scope the
+  entitlements with sales up front so a PoC actually exercises the mode you intend to
+  buy.
 
 ## The landscape: Traefik Hub · IBM API Connect · WSO2 · Gravitee
 
@@ -69,10 +90,10 @@ is this PoC; the Gravitee column is from public docs pending my own PoC.
 | AI / LLM gateway | First-class: Content + LLM guards, token cost, semantic cache | **GA 2025**: LLM governance, rate/cost, caching, analytics | Emerging | Agent platform: identity/access, guardrails maturing |
 | MCP / agent governance | **TBAC** in front of MCP servers (per-identity, per-tool) | MCP via **API→MCP** + ContextForge proxy/guardrails | Emerging | **MCP** (APIs→MCP), **A2A**, agent identity/access |
 | Event-native (Kafka/MQTT) | No (HTTP/gRPC) | Limited | Partial | **Yes, core differentiator** |
-| Beyond Kubernetes | VMs/Docker/Swarm/file (AI/MCP K8s-first) | VM/appliance/container | VM/container/hybrid | VM/container/hybrid/K8s |
-| Air-gap / sovereignty | Offline mode, **validate**; self-host models | **Battle-tested** in regulated banks | OSS core **fully offline-able** | On-prem/hybrid; French-rooted trust |
+| Beyond Kubernetes | VMs/Docker/Swarm/Nomad/file, **same features** | VM/appliance/container | VM/container/hybrid | VM/container/hybrid/K8s |
+| Air-gap / sovereignty | **Offline mode GA** across API+AI+MCP; self-host models | **Battle-tested** in regulated banks | OSS core **fully offline-able** | On-prem/hybrid; French-rooted trust |
 
-Sources: IBM [AI Gateway announcement](https://www.ibm.com/new/announcements/how-an-ai-gateway-provides-greater-control-and-visibility-into-ai-services) & [API Connect MCP docs](https://www.ibm.com/docs/en/api-connect/software/12.1.0?topic=tools-ai-gateway-mcp), [ContextForge](https://github.com/IBM/mcp-context-forge); WSO2 [Choreo/subscription model](https://wso2.com/library/blogs/choreo-for-api-management/); Gravitee [AI agent platform](https://www.gravitee.io/platform/ai-agent-management) & [origin](https://siliconcanals.com/gravitee-io-raises-29-7m/); Traefik [multi-provider install](https://doc.traefik.io/traefik-hub/api-gateway/setup/installation/docker).
+Sources: IBM [AI Gateway announcement](https://www.ibm.com/new/announcements/how-an-ai-gateway-provides-greater-control-and-visibility-into-ai-services) & [API Connect MCP docs](https://www.ibm.com/docs/en/api-connect/software/12.1.0?topic=tools-ai-gateway-mcp), [ContextForge](https://github.com/IBM/mcp-context-forge); WSO2 [Choreo/subscription model](https://wso2.com/library/blogs/choreo-for-api-management/); Gravitee [AI agent platform](https://www.gravitee.io/platform/ai-agent-management) & [origin](https://siliconcanals.com/gravitee-io-raises-29-7m/); Traefik [multi-provider install](https://doc.traefik.io/traefik-hub/api-gateway/setup/installation/docker), [provider overview](https://doc.traefik.io/traefik-hub/api-gateway/reference/install/providers/ref-provider-overview), [offline mode](https://doc.traefik.io/traefik-hub/api-gateway/setup/installation/offline-mode) & [platform-wide offline launch](https://traefik.io/press/traefik-labs-launches-mcp-gateway-nvidia-safety-nims-integration-and-platform-wide-offline-deployment).
 
 **Read:** all four are credible; the differences are about *emphasis*, and the field
 is moving monthly.
@@ -100,14 +121,32 @@ project demonstrates.
 
 French regulated buyers increasingly require **on-prem or SecNumCloud-qualified
 (ANSSI)** deployments, and the strictest (defense, some banking, sensitive public
-sector) require **true air-gap**. Two hard dependencies in *this* PoC would not
-survive an air-gapped review, and both are addressable:
+sector) require **true air-gap**. Two things in *this* PoC leave the perimeter, and
+the important point is that **neither is an architectural blocker**:
 
-1. **Hub control-plane SaaS (`api.traefik.io`).** The chart exposes a
-   `hub.offline` value ("disables all external network connections"). For a
-   sovereign deployment this is the **single most important thing to validate**:
-   does offline mode preserve API + AI + MCP gateway features, and how is licensing
-   handled without call-home? Get it in writing before proposing.
+1. **Hub control-plane registration (`api.traefik.io`).** My trial token carried no
+   offline entitlement, so this gateway ran in **connected** mode and the agent
+   logged `Unable to ping platform api.traefik.io` whenever the laptop was offline.
+   That log line is easy to misread, so it is worth being precise about what it does
+   and does not mean:
+     - **Client traffic never touches the platform.** The data plane is entirely
+       self-hosted; requests, prompts and tool calls stay inside the perimeter.
+     - **In connected mode the data plane keeps serving traffic** when the platform
+       is unreachable. What it loses is the ability to *push configuration changes*
+       from the online dashboard, which is a control-plane inconvenience, not a
+       traffic outage.
+     - **Offline mode is GA and covers the whole offering**, API, AI and MCP
+       gateways alike. It is enabled by an **`offline` claim baked into the gateway
+       token**, which the dashboard writes when you tick "Offline gateway" while
+       **creating a new gateway**. You cannot flip an existing connected gateway
+       offline by changing a Helm value: the `hub.offline` / `--hub.offline=true`
+       setting only accompanies a token that already carries the claim. Licensing in
+       that mode is validated locally against the token's expiry, so a renewal means
+       replacing the token in the gateway.
+
+    So for a sovereign estate this is an **entitlement and provisioning decision made
+    at gateway-creation time**, not an open technical risk to litigate.
+
 2. **Hosted NVIDIA NIM endpoint.** This PoC routes to `integrate.api.nvidia.com`
    for convenience. An air-gapped variant **self-hosts the models**: NVIDIA NIM
    containers (`nvcr.io/nim/...`) on on-prem GPUs (the same `nemoguard` guard model
@@ -115,10 +154,11 @@ survive an air-gapped review, and both are addressable:
    Services. No architecture change; only the endpoints move inside the perimeter.
 
 !!! note "The air-gapped reference architecture"
-    Same three gates, but: Traefik Hub in **offline mode**, **self-hosted NIMs** on
-    on-prem/OpenShift GPUs, models and images mirrored into an internal registry,
-    and the LLM Guard / Content Guard pointed at in-cluster endpoints. The GitOps
-    and TBAC story is **identical**, which is the point.
+    Same three gates, but: the gateway **created as an offline gateway** from the
+    start, **self-hosted NIMs** on on-prem/OpenShift GPUs, models and images mirrored
+    into an internal registry, and the LLM Guard / Content Guard pointed at
+    in-cluster endpoints. The GitOps and TBAC story is **identical**, which is the
+    point.
 
 ### Regulatory fit (why a French CISO should care)
 
@@ -129,8 +169,10 @@ survive an air-gapped review, and both are addressable:
   telemetry give a concrete, demonstrable **governance posture** for AI systems.
 - **GDPR / data residency:** deterministic **PII blocking before the model**, and
   EU-region or on-prem inference, address data-minimisation and residency.
-- **ANSSI / SecNumCloud, HDS (health):** feasible **only** once the offline +
-  self-hosted-model architecture above is confirmed; that is the gating item.
+- **ANSSI / SecNumCloud, HDS (health):** reachable with the offline +
+  self-hosted-model architecture above. The gating item is **procurement** (securing
+  the offline entitlement and provisioning the gateway as offline from day one),
+  not a capability gap.
 
 ### How I would pitch it
 
@@ -153,8 +195,11 @@ fit, not a single winner.
 
 For the **mainstream French cloud-native** segment (banks modernising on
 Kubernetes/OpenShift with GitOps in place) Traefik Hub is an easy thing to propose
-today. For **air-gapped / SecNumCloud** institutions I'd propose it **conditionally**, contingent on validating offline mode and
-standing up self-hosted NIMs, and keep the incumbent (API Connect) in the conversation for the classic-API, already-certified
-estate. The most likely winning play is rarely rip-and-replace; it's **the right
-AI/agent-native gateway alongside what's already approved**, and which gateway that
-is deserves a hands-on PoC per vendor, not a datasheet comparison.
+today. For **air-gapped / SecNumCloud** institutions it is also proposable, with the
+work sitting in procurement and provisioning (an offline entitlement, the gateway
+created as offline, self-hosted NIMs on your GPUs) rather than in architecture, and
+with the incumbent (API Connect) still worth keeping in the conversation for the
+classic-API, already-certified estate. The most likely winning play is rarely
+rip-and-replace; it's **the right AI/agent-native gateway alongside what's already
+approved**, and which gateway that is deserves a hands-on PoC per vendor, not a
+datasheet comparison.

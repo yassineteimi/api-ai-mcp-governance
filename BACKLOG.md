@@ -18,7 +18,7 @@ Add an **Open in Google Cloud Shell** button (deep link that clones the repo and
 
 ## Air-gapped reference variant
 
-A sovereign/air-gapped profile: Traefik Hub in **offline mode** (`hub.offline`, validate it preserves API + AI + MCP features), **self-hosted NVIDIA NIMs** (`nvcr.io/nim/...`) on on-prem/OpenShift GPUs instead of the hosted endpoint, images/models mirrored into an internal registry. Same gates, same GitOps and TBAC; only the endpoints move inside the perimeter. High value for the French regulated/SecNumCloud market (see the Evaluation page).
+A sovereign/air-gapped profile: the gateway **created as an offline gateway** in the Hub dashboard so the license token carries the `offline` claim (offline mode is GA across API + AI + MCP; it cannot be switched on for an existing connected gateway by changing `hub.offline` alone), **self-hosted NVIDIA NIMs** (`nvcr.io/nim/...`) on on-prem/OpenShift GPUs instead of the hosted endpoint, images/models mirrored into an internal registry. Same gates, same GitOps and TBAC; only the endpoints move inside the perimeter. High value for the French regulated/SecNumCloud market (see the Evaluation page). **Blocker to clear first:** an offline entitlement on the license, which the trial token does not carry.
 
 ## Gate 2: AI Gateway
 

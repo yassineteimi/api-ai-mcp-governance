@@ -8,7 +8,7 @@ for AI token usage and MCP tool calls. The whole stack is GitOps-managed.
 ```mermaid
 flowchart LR
   T[Traefik Hub] -->|Prometheus :9100| P[Prometheus]
-  T -.->|OTLP · AI tokens, MCP tools| O[OTel Collector]
+  T -.->|OTLP · AI tokens, MCP tools| O["OTel Collector<br/>(one option of several)"]
   O -->|Prometheus exporter| P
   P --> G[Grafana]
 ```
@@ -79,9 +79,15 @@ apps-ecommerce-mcp-…    403   6    # Gate 3: TBAC tool denials
 ## AI & MCP metrics via OpenTelemetry
 
 Traefik exposes request metrics on the Prometheus endpoint, but the **AI- and
-MCP-specific** metrics are emitted over **OTLP** only. An OpenTelemetry Collector
-receives them and re-exposes them to Prometheus. What arrives is richer than
+MCP-specific** metrics are emitted over **OTLP**. What arrives is richer than
 expected: it follows the OpenTelemetry **GenAI semantic conventions**.
+
+!!! tip "The collector is a choice, not a requirement"
+    This PoC runs an OpenTelemetry Collector because the cluster started empty and a
+    collector is the most instructive thing to show. In a real estate you would
+    usually point Traefik's OTLP exporter at the collector you **already run**, or
+    enable **Prometheus 3.x native OTLP ingestion** (`--web.enable-otlp-receiver`)
+    and remove the hop altogether.
 
 ### Implementation
 
@@ -146,6 +152,7 @@ output = 167
 | `gen_ai_client_token_usage_sum` | Input/output **token counts** by model, drives a **cost** estimate |
 | `gen_ai_client_operation_duration_seconds` | LLM call latency |
 | `traefik_hub_llm_guard_requests_total{reason}` | **LLM Guard blocks by reason** (e.g. `unsafe_content`) |
+| `traefik_hub_content_guard_requests_total{reason}` | **Content Guard blocks by rule reason** (`pii_credit_card`, `pii_ssn`) |
 | `mcp_client_operation_duration_seconds_count{mcp_method_name,error_type}` | **MCP tool-call decisions** (allow vs `error_type="403"`) |
 
 Observed live after traffic:
@@ -172,16 +179,30 @@ blocks by reason, and MCP operations by method/decision.
 - Request metrics carry per-route labels, so each gate's blocks (401/403) are
   directly visible without custom instrumentation.
 
-**Rough edges (worth flagging):**
+**Worth knowing before you build the pipeline:**
 
-- The AI/MCP metrics are **OTLP-only**: you *must* run a collector to get them
-  into Prometheus; they aren't on Traefik's Prometheus endpoint. Expect that extra
-  hop.
-- **Content Guard** has no obvious dedicated counter like LLM Guard's
-  `..._requests_total{reason}`; its blocks are only visible as `403` on the route.
-- On a denied MCP `tools/call`, `mcp_tool_name` isn't always populated (the request
-  is rejected before tool resolution), so deny-by-tool charts lean on `error_type`
-  + the route's `403`.
+- The AI/MCP metrics are **OTLP, not Prometheus-endpoint**. That is an OTel-native
+  design choice, not a missing feature: if you already run an OTel pipeline the
+  metrics land in it with no adapter. The collector in this PoC exists because I was
+  building the pipeline from scratch on an empty cluster. Two lighter paths exist:
+  point Traefik's OTLP exporter at your existing collector, or use **Prometheus 3.x
+  native OTLP ingestion** ([`--web.enable-otlp-receiver`](https://prometheus.io/docs/guides/opentelemetry/),
+  exposing `/api/v1/otlp/v1/metrics`) and drop the collector entirely.
+- **The GenAI metrics are opt-in per middleware**, through the
+  `observability.metrics` block (`level: detailed`, or an `excludeList` to drop
+  individual series). If an AI metric looks absent, check that block before
+  concluding the signal does not exist.
+- **Both guards do emit a blocking signal.** LLM Guard and Content Guard each expose
+  a `..._requests_total` counter labelled with the **`reason`** you set on the rule
+  (`pii_credit_card` and `pii_ssn` in [Gate 2](gates/ai-gateway.md)), and add the same
+  `reason` as an OpenTelemetry span attribute. This PoC's dashboard charts LLM Guard
+  by reason; the Content Guard counter
+  (`traefik_hub_content_guard_requests_total{reason}`) is the equivalent series and is
+  a natural next panel.
+- **One open item.** On a **denied** MCP `tools/call` I could not get the tool name
+  populated on `mcp_client_operation_duration_seconds_count`, so deny-by-tool charts
+  here lean on `error_type` plus the route's `403`. Traefik's read is that this may be
+  an unexpected bug rather than intended behaviour, and it is being investigated.
 - Operational gotchas (documented inline): `deployment.podAnnotations` (not root),
   the collector needs a restart to pick up config, and querying the in-pod
   exporter directly can mislead. **Query Prometheus**, not the collector's

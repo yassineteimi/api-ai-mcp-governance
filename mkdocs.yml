@@ -1,4 +1,4 @@
-site_name: "Traefik Hub: Triple Gate PoC"
+site_name: "API, AI and MCP Governance: the Triple Gate PoC"
 
 nav:
   - Overview: index.md
@@ -15,14 +15,14 @@ nav:
 
 site_author: Yassine TEIMI
 site_description: >-
-  A homelab benchmark of Traefik Hub's "Triple Gate": API Gateway, AI Gateway,
-  and MCP Gateway, for cloud-native API and AI governance. GitOps-first with
-  ArgoCD on a local Kubernetes cluster: declarative auth, rate limiting, LLM
-  content/safety guards, semantic caching, token quotas, and tool-level access
-  control (TBAC) for Model Context Protocol servers.
+  A reproducible homelab benchmark of three governance gates for modern traffic:
+  an API gateway, an AI gateway, and an MCP gateway, built GitOps-first with
+  ArgoCD on a local Kubernetes cluster. Declarative auth, rate limiting, LLM
+  content and safety guards, token cost telemetry, and tool-level access control
+  (TBAC) for Model Context Protocol servers. Implemented with Traefik Hub.
 
-repo_name: yassineteimi/traefik-hub-triple-gate
-repo_url: https://github.com/yassineteimi/traefik-hub-triple-gate
+repo_name: yassineteimi/api-ai-mcp-governance
+repo_url: https://github.com/yassineteimi/api-ai-mcp-governance
 
 theme:
   name: material

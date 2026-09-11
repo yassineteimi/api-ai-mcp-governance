@@ -16,6 +16,14 @@ through them as **defense in depth**, the GitOps control loop, and the homelab t
 Each gate is an `IngressRoute` plus an ordered chain of middlewares; the route's **Host**
 selects the gate. The same Traefik Hub instance serves all three.
 
+!!! info "Kubernetes here, not Kubernetes-only"
+    Every gate below is expressed as a **Kubernetes CRD** because this PoC is
+    GitOps-on-Kubernetes by design. Hub is built on OSS Traefik Proxy, so the same
+    routers and middlewares (AI and MCP ones included) can be declared as
+    [Docker labels or file-provider YAML](https://doc.traefik.io/traefik-hub/api-gateway/reference/install/providers/ref-provider-overview)
+    instead. Read the CRDs as one dialect of a provider-agnostic configuration model,
+    not as a Kubernetes prerequisite.
+
 ## Request flow: defense in depth
 
 A request is screened by an *ordered chain*, and each gate refuses a **different class**
@@ -106,17 +114,21 @@ flowchart TB
   T -->|Prometheus :9100| P
   T -.->|OTLP| OT --> P
   P --> GR
-  T <-->|register / control| HUB{{Traefik Hub SaaS<br/>api.traefik.io}}
+  T <-.->|"config pull (connected mode only)"| HUB{{Traefik Hub platform<br/>api.traefik.io}}
   X -->|HTTPS| NIM{{NVIDIA NIM<br/>integrate.api.nvidia.com}}
 ```
 
 ### Trust boundary: what leaves the perimeter
 
-Two things cross the homelab boundary, and both are the focus of the
+Two things cross the homelab boundary, and both are covered in the
 [air-gapped analysis](evaluation.md#sovereignty-air-gap-the-decisive-axis):
 
-1. **Traefik Hub control plane** (`api.traefik.io`): the data plane is self-hosted,
-   but the agent registers and phones home by default (`hub.offline` is the lever to validate).
+1. **Traefik Hub control plane** (`api.traefik.io`): the agent registers and pulls
+   configuration changes from the platform because this gateway was created as a
+   **connected** gateway (my trial token carried no offline entitlement). **Client
+   traffic never leaves the data plane**, and if the platform is unreachable the
+   gateway keeps serving; it only stops receiving config pushes. A gateway created as
+   an **offline gateway** in the dashboard drops this link entirely.
 2. **NVIDIA hosted NIM** (`integrate.api.nvidia.com`) serves *both* the chat model
    and the safety guard. An air-gapped variant self-hosts these as in-cluster NIMs; the gate
    topology is unchanged; only the endpoints move inside.

@@ -1,9 +1,9 @@
-# Traefik Hub: Triple Gate PoC
+# API, AI and MCP Governance: the Triple Gate PoC
 
-A hands-on benchmark of **[Traefik Hub](https://doc.traefik.io/traefik-hub/)**'s *Triple Gate*: three enforcement points that govern **API**, **AI (LLM)**, and **agent (MCP)** traffic as **defense in depth**. Everything is reconciled declaratively by **ArgoCD** on a single-node Kubernetes homelab, **no GPU required**.
+Three enforcement points that govern **API**, **AI (LLM)**, and **agent (MCP)** traffic as **defense in depth**. Everything is reconciled declaratively by **ArgoCD** on a single-node Kubernetes homelab, **no GPU required**. The gateway under test here is **[Traefik Hub](https://doc.traefik.io/traefik-hub/)**, but the gate model and the benchmark method are vendor-neutral by design.
 
 !!! abstract "What this is"
-    A neutral technical evaluation of Traefik Hub for **cloud-native API and AI governance**, built and documented step by step so you can reproduce it. It doubles as a portfolio piece; quality and clarity are first-class goals alongside "it works".
+    A reproducible **benchmark method** for API, AI and agent governance, built and documented step by step so you can run it yourself, against this gateway or another one. It doubles as a portfolio piece; quality and clarity are first-class goals alongside "it works".
 
 ## The three gates
 
@@ -24,7 +24,7 @@ The gates compose. A prompt-injection attempt that tries to make an agent exfilt
 3. **The Three Gates**: one tutorial chapter each: [API](gates/api-gateway.md), [AI](gates/ai-gateway.md), [MCP](gates/mcp-gateway.md).
 4. **[Unified Demo](unified-demo.md)**: the multi-gate attack scenario.
 5. **[Observability](observability.md)**: OpenTelemetry + Prometheus + Grafana findings.
-6. **[Evaluation Notes](evaluation.md)**: what impressed, what I'd flag, and how Traefik's GitOps model compares to other API management platforms.
+6. **[Evaluation Notes](evaluation.md)**: what impressed, what I'd flag, and how this GitOps model sits next to the other API management platforms in the market.
 
 ---
 

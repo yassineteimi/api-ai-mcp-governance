@@ -7,7 +7,7 @@ flowchart LR
   Git[("Git repo<br/>poc/argocd/")] -->|watches| Root[ArgoCD<br/>app-of-apps]
   Root -->|reconciles| TF[Traefik Hub<br/>Application]
   TF -->|Helm chart 41.0.0| Cluster[(kind cluster<br/>triple-gate)]
-  Hub{{Traefik Hub SaaS}} <-->|token registers gateway| Cluster
+  Hub{{Traefik Hub platform}} -.->|token registers gateway| Cluster
 ```
 
 ## M0.1: Cluster
