@@ -2,6 +2,10 @@
 
 Deferred enhancements to tackle after the v1 tutorial (the three gates + unified demo + observability) is complete.
 
+## Re-run Gate 3 against the stateless MCP spec (new top priority)
+
+The **2026-07-28 MCP specification** removed the `initialize` / `notifications/initialized` handshake, dropped protocol-level sessions and the `Mcp-Session-Id` header from Streamable HTTP, moved protocol version and client capabilities into `_meta`, and added `ttlMs` / `cacheScope` to list results. Gate 3's TBAC policy allow-lists the two handshake methods explicitly (the policy language has no `NotEquals`), so those rules are now vestigial. Rebuild the MCP server on a current SDK, rewrite the policy against the new method set, and re-verify the allow/deny demo. Also worth testing: routing on the `Mcp-Method` header, and whether per-tool authorization still composes the same way once intermediaries may cache `tools/list`.
+
 ## Reproducibility: one-click "Open in Cloud Shell" + small GKE
 
 Add an **Open in Google Cloud Shell** button (deep link that clones the repo and opens a `tutorial.md` guided pane) so a reader gets a predictable Linux environment (bash 5, Docker, kubectl, helm, gcloud preinstalled), no macOS/Homebrew/Colima variance.
@@ -22,8 +26,11 @@ A sovereign/air-gapped profile: the gateway **created as an offline gateway** in
 
 ## Gate 2: AI Gateway
 
+> Refreshed 2026-09-11: Hub **3.20** (6 May 2026) shipped an **AI token rate limit and quota middleware** with pre-request estimation, a **parallel LLM Guard** (concurrent guardrails instead of a serial chain), a **Content Guard regex engine**, and configurable guard `onDenyResponse` formats. The PoC ran on 3.19, so the items below are now about **exercising shipped features**, not waiting for them. Upgrade the chart first.
+
 - **Semantic cache.** Serve repeated/similar prompts from cache without an LLM round-trip (latency + cost win). Traefik Hub AI Gateway semantic-cache middleware.
-- **Token rate-limit / quota.** Per-identity token budgets for cost governance.
+- **Token rate-limit / quota.** Per-identity token budgets for cost governance. Shipped in 3.20 with pre-request estimation.
+- **Parallel guard pipeline.** Re-run Gate 2 with guards executing concurrently rather than content-guard then llm-guard in series, and compare added latency.
 - **Automatic provider failover.** Route to a second LLM (OpenAI or local Ollama) when the primary NVIDIA NIM fails. `.env` already has placeholders `OPENAI_API_KEY` / `OLLAMA_API_BASE`.
 
   _Deferred from M2 (v1 ships routing + Content Guard + LLM Guard); finish in v2._

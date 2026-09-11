@@ -12,16 +12,19 @@ how does it sit next to the alternatives".
     API/AI/MCP gateways, built hands-on against Traefik Hub, repeatable against any
     gateway. The competitor notes below are a **factual landscape**, not a scoreboard:
     each platform is credited for what it genuinely does well. Vendor claims move
-    fast in this space; everything here is **as of late 2025** and linked to a
+    fast in this space; everything here is **as of September 2026** and linked to a
     source; verify before quoting.
 
-!!! success "Reviewed with the vendor"
-    An earlier revision of this page drew three conclusions from **trial defaults and
-    documentation examples** rather than from the product: that the AI and MCP
-    gateways were Kubernetes-first, that offline mode was an open question, and that
-    guard observability needed assembly. Traefik reviewed the page and corrected all
-    three; the text below reflects the corrections, with sources. Keeping the method
-    honest matters more than keeping the first draft.
+!!! warning "The hands-on run predates some of what is described here"
+    The PoC itself was built in **June 2026** against **Traefik Hub 3.19 / Proxy
+    3.7.5**. The landscape below is refreshed to September 2026, so it includes
+    capabilities I did **not** exercise myself. Anything I ran is reported from
+    captured output; anything I did not is attributed to a vendor source and labelled
+    as such. Three things since the first draft materially changed the field: **IBM
+    completed its $11B acquisition of Confluent on 17 March 2026**, **Traefik Hub 3.20
+    shipped on 6 May 2026** with several of the things this PoC had deferred to a v2
+    backlog, and **MCP itself went stateless on 28 July 2026**. Each is flagged in
+    place below.
 
 ## What impressed me
 
@@ -75,6 +78,38 @@ how does it sit next to the alternatives".
   entitlements with sales up front so a PoC actually exercises the mode you intend to
   buy.
 
+!!! note "Shipped since this PoC ran (Hub 3.20, 6 May 2026)"
+    Three things I deferred to a v2 backlog or worked around have since landed, so
+    treat the flags above as bounded by the 3.19 version I tested: an **AI token rate
+    limit and quota middleware** with pre-request estimation, a **parallel LLM Guard**
+    that runs guardrails concurrently instead of chaining them serially, and a
+    **Content Guard regex engine** plus configurable `onDenyResponse` formats. The
+    same release added **FIPS 140-3 support**, **multi-cluster API federation**, and
+    **OpenAPI request body schema validation**. I have not exercised any of them; they
+    are listed because leaving them out would make this page read as more damning than
+    the current product deserves.
+
+!!! danger "MCP went stateless on 28 July 2026, which dates this PoC's Gate 3"
+    The [2026-07-28 MCP specification](https://modelcontextprotocol.io/specification/2026-07-28/changelog)
+    made the protocol **stateless at the protocol layer**: the
+    `initialize` / `notifications/initialized` handshake is **removed**, protocol-level
+    sessions and the `Mcp-Session-Id` header are gone from the Streamable HTTP
+    transport, every request carries its protocol version and client capabilities in
+    `_meta`, and list results now carry `ttlMs` / `cacheScope` so intermediaries can
+    cache them. This PoC was built against the previous spec, and its TBAC policy
+    **explicitly allow-lists `initialize` and `notifications/initialized`** because the
+    policy language has no `NotEquals` (see [Gate 3](gates/mcp-gateway.md)). Those two
+    rules are now vestigial.
+
+    The interesting part is what it means for **gateways in general**, not just this
+    one. A stateless MCP server can sit behind a plain round-robin load balancer, be
+    routed on an `Mcp-Method` header, and have its `tools/list` cached, so the
+    sticky-session and deep-inspection work gateways used to do for MCP largely goes
+    away. Per-tool authorization, which is the whole point of Gate 3, becomes *more*
+    important rather than less: it is now the main thing a gateway is uniquely
+    positioned to enforce on this traffic. Re-running this benchmark against the new
+    spec is the first item I would put in a v2.
+
 ## The landscape: Traefik Hub · IBM API Connect · WSO2 · Gravitee
 
 A fair, point-in-time read of four credible platforms, two of them **French-rooted**
@@ -84,16 +119,16 @@ is this PoC; the Gravitee column is from public docs pending my own PoC.
 
 | Dimension | **Traefik Hub** | **IBM API Connect** | **WSO2 APIM** | **Gravitee** |
 | --- | --- | --- | --- | --- |
-| Model / origin | Open-core; French-founded | Commercial (DataPower) | Open-core + subscription + Choreo SaaS | Open-core; French-founded (Lille, 2014) |
+| Model / origin | Open-core; French-founded | Commercial (DataPower); **owns Confluent since 3/2026** | Open-core + subscription + Choreo SaaS; **EQT-owned since 2024** | Open-core; French-founded (Lille, 2014) |
 | Config & GitOps | **CRD-native, GitOps-first** | Mgmt UI/CLI; GitOps add-on | UI + APICTL; config-as-code possible | UI + APIs; K8s Gateway API + GitOps |
 | Footprint | **Light** (proxy + agent) | Heavy (Mgmt/Portal/Analytics/DataPower) | Medium-heavy | Medium |
-| AI / LLM gateway | First-class: Content + LLM guards, token cost, semantic cache | **GA 2025**: LLM governance, rate/cost, caching, analytics | Emerging | Agent platform: identity/access, guardrails maturing |
-| MCP / agent governance | **TBAC** in front of MCP servers (per-identity, per-tool) | MCP via **API→MCP** + ContextForge proxy/guardrails | Emerging | **MCP** (APIs→MCP), **A2A**, agent identity/access |
-| Event-native (Kafka/MQTT) | No (HTTP/gRPC) | Limited | Partial | **Yes, core differentiator** |
+| AI / LLM gateway | First-class: Content + LLM guards, parallel guard pipeline, token quota, semantic cache | **GA 2025**: LLM governance, rate/cost, caching, analytics | **API Platform GA 3/2026**: AI Gateway over models, MCP servers and prompts | Agent platform: identity/access, **agent mesh**, guardrails |
+| MCP / agent governance | **TBAC** in front of MCP servers (per-identity, per-tool) | MCP via **API→MCP** + ContextForge proxy/guardrails | **MCP tool management** in the AI Gateway | **MCP** (APIs→MCP), **A2A**, agent identity/access |
+| Event-native (Kafka/MQTT) | No (HTTP/gRPC) | **Yes, now the leader** (Confluent/Kafka + MQ) | Partial | **Yes, long-standing strength** |
 | Beyond Kubernetes | VMs/Docker/Swarm/Nomad/file, **same features** | VM/appliance/container | VM/container/hybrid | VM/container/hybrid/K8s |
-| Air-gap / sovereignty | **Offline mode GA** across API+AI+MCP; self-host models | **Battle-tested** in regulated banks | OSS core **fully offline-able** | On-prem/hybrid; French-rooted trust |
+| Air-gap / sovereignty | **Offline mode GA** across API+AI+MCP; **FIPS 140-3** (Hub 3.20); self-host models | **Battle-tested** in regulated banks | OSS core **fully offline-able** | On-prem/hybrid; French-rooted trust |
 
-Sources: IBM [AI Gateway announcement](https://www.ibm.com/new/announcements/how-an-ai-gateway-provides-greater-control-and-visibility-into-ai-services) & [API Connect MCP docs](https://www.ibm.com/docs/en/api-connect/software/12.1.0?topic=tools-ai-gateway-mcp), [ContextForge](https://github.com/IBM/mcp-context-forge); WSO2 [Choreo/subscription model](https://wso2.com/library/blogs/choreo-for-api-management/); Gravitee [AI agent platform](https://www.gravitee.io/platform/ai-agent-management) & [origin](https://siliconcanals.com/gravitee-io-raises-29-7m/); Traefik [multi-provider install](https://doc.traefik.io/traefik-hub/api-gateway/setup/installation/docker), [provider overview](https://doc.traefik.io/traefik-hub/api-gateway/reference/install/providers/ref-provider-overview), [offline mode](https://doc.traefik.io/traefik-hub/api-gateway/setup/installation/offline-mode) & [platform-wide offline launch](https://traefik.io/press/traefik-labs-launches-mcp-gateway-nvidia-safety-nims-integration-and-platform-wide-offline-deployment).
+Sources: IBM [AI Gateway announcement](https://www.ibm.com/new/announcements/how-an-ai-gateway-provides-greater-control-and-visibility-into-ai-services) & [API Connect MCP docs](https://www.ibm.com/docs/en/api-connect/software/12.1.0?topic=tools-ai-gateway-mcp), [ContextForge](https://github.com/IBM/mcp-context-forge), [Confluent acquisition completed 17 March 2026](https://newsroom.ibm.com/2026-03-17-ibm-completes-acquisition-of-confluent,-making-real-time-data-the-engine-of-enterprise-ai-and-agents); WSO2 [Choreo/subscription model](https://wso2.com/library/blogs/choreo-for-api-management/), [API Platform GA March 2026](https://wso2.com/about/news/wso2-launches-api-platform/) & [EQT acquisition completed](https://wso2.com/about/news/eqt-completes-acquisition-of-wso2/); Gravitee [AI agent platform](https://www.gravitee.io/platform/ai-agent-management) & [origin](https://siliconcanals.com/gravitee-io-raises-29-7m/); Traefik [multi-provider install](https://doc.traefik.io/traefik-hub/api-gateway/setup/installation/docker), [provider overview](https://doc.traefik.io/traefik-hub/api-gateway/reference/install/providers/ref-provider-overview), [offline mode](https://doc.traefik.io/traefik-hub/api-gateway/setup/installation/offline-mode), [platform-wide offline launch](https://traefik.io/press/traefik-labs-launches-mcp-gateway-nvidia-safety-nims-integration-and-platform-wide-offline-deployment) & [Hub 3.20, 6 May 2026](https://www.businesswire.com/news/home/20260506649151/en/Traefik-Labs-Makes-Ingress-NGINX-Replacement-GA-Adds-Multi-Cluster-API-Federation-and-Agent-Aware-AI-Controls).
 
 **Read:** all four are credible; the differences are about *emphasis*, and the field
 is moving monthly.
@@ -104,16 +139,36 @@ is moving monthly.
 - **IBM API Connect** ships a GA AI Gateway (2025) with LLM governance, cost
   controls and caching, plus an MCP story (turn APIs into MCP tools; ContextForge as
   an MCP/A2A proxy with guardrails). Its enduring edge is **incumbency and air-gap
-  pedigree** in French banks/insurers.
-- **WSO2** is the **open-core, offline-friendly** choice sovereignty teams trust, with
-  API + event coverage; AI gateway features are earlier.
-- **Gravitee** is, alongside Traefik, **closest to where the market is heading**:
-  **event-native** *and* leaning hard into **agent/MCP/A2A governance**, with a
-  **French origin** that plays well for sovereignty.
+  pedigree** in French banks/insurers, and the Confluent acquisition (below) has
+  turned its weakest column into its strongest.
+- **WSO2** is the **open-core, offline-friendly** choice sovereignty teams trust. Its
+  **API Platform went GA in March 2026**, putting APIs, AI models, MCP servers and
+  prompts under one control plane with an AI Gateway that manages MCP tools, so the
+  "AI features are earlier" read I held in 2025 no longer holds. EQT has owned the
+  company since 2024, which matters to buyers who weigh vendor ownership.
+- **Gravitee** leans hard into **agent/MCP/A2A governance** (including an agent mesh)
+  on top of a long-standing **event-native** gateway, with a **French origin** that
+  plays well for sovereignty. Its event-native story is no longer uncontested, which
+  makes the agent layer the more interesting part of its pitch.
 
-The honest caveat: AI/agent feature sets across all four change fast, so a real
-head-to-head needs a **hands-on PoC per vendor**, which is exactly the method this
-project demonstrates.
+!!! info "The consolidation that reshaped this table"
+    **IBM completed its $11B acquisition of Confluent on 17 March 2026** (announced
+    8 December 2025). Confluent is the commercial Kafka vendor, used by over 6,500
+    enterprises, and the deal puts IBM at roughly **half the event broker and
+    messaging market** when combined with MQ. Two consequences for this comparison:
+    the "event-native" row, where IBM was previously the weakest of the four, is now
+    where it is **strongest**; and **event-native alone is no longer a differentiator
+    a challenger can lean on**, because the incumbent most French banks already run
+    now owns the category leader. For a buyer already running MQ and API Connect,
+    "real-time data plus API and AI governance from one vendor" became a much easier
+    story to tell internally. That raises the bar for anyone displacing them: the
+    argument has to be the **operating model** (GitOps, footprint, agent-native
+    control), not the feature checklist.
+
+The honest caveat: AI/agent feature sets across all four change fast, and this page
+has already been overtaken once by two acquisitions and a major release. A real
+head-to-head needs a **hands-on PoC per vendor, re-run at the time of the decision**,
+which is exactly the method this project demonstrates.
 
 ## Positioning for the French / regulated market
 
@@ -142,7 +197,11 @@ the important point is that **neither is an architectural blocker**:
        offline by changing a Helm value: the `hub.offline` / `--hub.offline=true`
        setting only accompanies a token that already carries the claim. Licensing in
        that mode is validated locally against the token's expiry, so a renewal means
-       replacing the token in the gateway.
+       replacing the token in the gateway. Traefik's own framing when they launched
+       platform-wide offline is that it runs "from Oracle Cloud to private
+       datacenters to completely air-gapped military installations with identical
+       features and performance", with the NVIDIA safety NIMs chaining into a
+       multi-layered pipeline that also runs entirely offline.
 
     So for a sovereign estate this is an **entitlement and provisioning decision made
     at gateway-creation time**, not an open technical risk to litigate.
@@ -173,6 +232,11 @@ the important point is that **neither is an architectural blocker**:
   self-hosted-model architecture above. The gating item is **procurement** (securing
   the offline entitlement and provisioning the gateway as offline from day one),
   not a capability gap.
+- **FIPS 140-3** (added in Hub 3.20, May 2026): not an EU requirement, but it is the
+  kind of cryptographic-module assurance that public-sector and defence-adjacent
+  procurement checklists ask for, and it signals the vendor is investing in the
+  certification track that regulated buyers screen on. Worth raising early, because
+  a missing box on a procurement grid kills deals that technical evaluations pass.
 
 ### How I would pitch it
 
@@ -180,18 +244,27 @@ the important point is that **neither is an architectural blocker**:
 > control point (auth, PII and safety guards, cost governance, and per-tool agent
 > authorization) with an audit trail that is your git history. For a sovereign or
 > air-gapped estate we run it offline with self-hosted NIMs on your OpenShift GPUs;
-> the policy model doesn't change. Where you already run API Connect for classic
-> APIs, this is the **AI/agent-native layer** in front of your LLMs and MCP servers,
-> not a rip-and-replace."*
+> the policy model doesn't change. Where you already run API Connect and MQ for
+> classic APIs and messaging, this is the **AI/agent-native layer** in front of your
+> LLMs and MCP servers, not a rip-and-replace."*
+
+Since IBM closed Confluent, expect the counter-pitch to be consolidation: one vendor
+for streaming, APIs and AI governance. The honest answer is not to deny the pull of
+that, but to separate the two decisions. Event streaming and agent-traffic governance
+have different lifecycles and different blast radii, and the agent layer is the one
+changing monthly. Buying it from the incumbent because the incumbent also sells Kafka
+is how estates end up with a control point that cannot be changed independently of
+the data backbone.
 
 ## Bottom line
 
 Traefik Hub has one of the **cleanest cloud-native operating models** I've worked
 with: GitOps/CRD-native, light, with a composable guard chain and per-tool TBAC that
-is genuinely well-executed. It is **not uniquely ahead**, though: IBM API Connect now
-ships a GA AI gateway with an MCP story, and **Gravitee** matches the modern direction
-(event-native, agent/MCP/A2A) with a French origin of its own. The differentiator is
-fit, not a single winner.
+is genuinely well-executed. It is **not uniquely ahead**, though, and less so than
+when I first wrote this page: IBM API Connect ships a GA AI gateway with an MCP story
+and now owns Confluent, **WSO2** shipped a unified API + AI + MCP platform in March
+2026, and **Gravitee** pairs agent/MCP/A2A governance with an event-native gateway and
+a French origin of its own. The differentiator is fit, not a single winner.
 
 For the **mainstream French cloud-native** segment (banks modernising on
 Kubernetes/OpenShift with GitOps in place) Traefik Hub is an easy thing to propose
